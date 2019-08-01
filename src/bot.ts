@@ -13,6 +13,7 @@ class Bot {
     private platform: string;
 
     private servercallSign: string;
+    private usemapname:boolean = false;
 
     private admins: string[] = [];
 
@@ -35,11 +36,12 @@ class Bot {
                 let a = fs.readFileSync(path.join(__dirname, "config.json"), 'utf8');
                 let config = JSON.parse(a);
                 self.token = config.token;
-                self.refreshInterval = config.refreshInterval;
+                self.refreshInterval = config.refreshInterval || 15000;
                 self.serverid = config.serverid;
-                self.platform = config.platform;
+                self.platform = config.platform || "pc";
                 self.servercallSign = config.servercallSign || "";
-                self.admins = config.admins;
+                self.admins = config.admins || [];
+                self.usemapname = config.usemapname || false;
 
                 let valid = config.token &&
                     config.refreshInterval &&
@@ -92,7 +94,17 @@ class Bot {
                     if (data.srv) {
                         let srv = data.srv;
                         if (srv.slots != undefined && srv.players != undefined && srv.map_name && srv.battlelog) {
-                            let name = self.servercallSign + " | " + srv.players + "/" + srv.slots;
+                            let name = ""; 
+                            
+                            if(this.usemapname && srv.map_name){
+                                name += srv.map_name;
+                            }else{
+                                name += self.servercallSign;
+                            }
+                            
+                            name = name.slice(0,12); //truncate overflow
+
+                            name += " | " + srv.players + "/" + srv.slots;
                             self.client.user.setPresence({ game: { name: name, url: srv.battlelog, type: "PLAYING" }, status: "online" });
                         }
                     }
