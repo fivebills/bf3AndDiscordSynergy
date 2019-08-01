@@ -1,6 +1,6 @@
 {
     "token":"",
-    "refreshInterval":150000,
+    "refreshInterval":15000,
     "serverid":"7d3adf3a-4675-4d23-a9c1-7713815cc5b0",
     "platform":"pc",
     "servercallSign":"Beer&Rush",
