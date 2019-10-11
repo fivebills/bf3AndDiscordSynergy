@@ -14,6 +14,7 @@ const fs = require("fs");
 const path = require("path");
 class Bot {
     constructor() {
+        this.mapmap = { "MP_001": "Grand Bazaar", "MP_003": "Tehran Highway", "MP_007": "Caspian Border", "MP_011": "Seine Crossing", "MP_012": "Operation Firestorm", "MP_013": "Damavand Peak", "MP_017": "Noshahr Canals", "MP_018": "Kharg Island", "MP_Subway": "Operation Metro", "XP1_001": "Strike at Karkand", "XP1_002": "Gulf of Oman", "XP1_003": "Sharqi Peninsula", "XP1_004": "Wake Island", "XP2_Factory": "Scrapmetal", "XP2_Office": "Operation 925", "XP2_Palace": "Donya Fortress", "XP2_Skybar": "Ziba Tower", "XP3_Alborz": "Alborz Mountains", "XP3_Desert": "Bandar Desert", "XP3_Shield": "Armored Shield", "XP3_Valley": "Death Valley", "XP4_FD": "Markaz Monolith", "XP4_Parl": "Azadi Palace", "XP4_Quake": "Epicenter", "XP4_Rubble": "Talah Market", "XP5_001": "Operation Riverside", "XP5_002": "Nebandan Flats", "XP5_003": "Kiasar Railroad", "XP5_004": "Sabalan Pipeline" };
         this.client = new Discord.Client();
         this.usemapname = false;
         this.admins = [];
@@ -69,7 +70,7 @@ class Bot {
             if (Bot.existsWithin(msg.author.id, this.admins)) {
                 if (msg.content == '!!debug') {
                     let out = `::::DEBUG::::\nplatform:${this.platform}\nserver:${this.serverid}\n`;
-                    out += `\`\`\`json\n${JSON.stringify(yield Bot.getServerStats(this.platform, this.serverid))}`;
+                    out += `\`\`\`json\n${JSON.stringify(yield Bot.getServerStatsBattleLog(this.serverid))}`;
                     out = out.slice(0, 1994) + "...```";
                     try {
                         yield msg.channel.send(out);
@@ -90,26 +91,30 @@ class Bot {
         return __awaiter(this, void 0, void 0, function* () {
             let self = this;
             try {
-                let data = yield Bot.getServerStats(self.platform, self.serverid);
-                if (data) {
-                    if (data.status === "found") {
-                        if (data.srv) {
-                            let srv = data.srv;
-                            if (srv.slots != undefined && srv.players != undefined && srv.map_name && srv.battlelog) {
-                                let name = "";
-                                if (this.usemapname && srv.map_name) {
-                                    name += srv.map_name;
-                                }
-                                else {
-                                    name += self.servercallSign;
-                                }
-                                name = name.slice(0, 12); //truncate overflow
-                                name += " | " + srv.players + "/" + srv.slots;
-                                self.client.user.setPresence({ game: { name: name, url: srv.battlelog, type: "PLAYING" }, status: "online" });
-                            }
-                        }
-                    }
+                //let data = await Bot.getServerStats(self.platform, self.serverid);
+                let data = yield Bot.getServerStatsBattleLog(self.serverid);
+                if (!data)
+                    return;
+                if (!data.slots['2'])
+                    return;
+                if (!data.map)
+                    return;
+                let map = self.mapmap[data.map];
+                if (!map)
+                    map = "";
+                let players = data.slots[2].current;
+                let maxplayers = data.slots[2].max;
+                let url = data.url;
+                let name = "";
+                if (this.usemapname && map) {
+                    name += map;
                 }
+                else {
+                    name += self.servercallSign;
+                }
+                name = name.slice(0, 12); //truncate overflow
+                name += " | " + players + "/" + maxplayers;
+                self.client.user.setPresence({ game: { name: name, url: url, type: "PLAYING" }, status: "online" });
             }
             catch (e) {
                 console.log(JSON.stringify(e));
@@ -140,6 +145,19 @@ class Bot {
                     }
                 });
             });
+        });
+    }
+    static getServerStatsBattleLog(serverid) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let res = yield fetch(`http://battlelog.battlefield.com/bf3/servers/getNumPlayersOnServer/pc/${serverid}/`, {
+                method: "GET",
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            let data = yield res.json();
+            data.url = `http://battlelog.battlefield.com/bf3/servers/show/pc/${serverid}/`;
+            return data;
         });
     }
     static existsWithin(a, b) {

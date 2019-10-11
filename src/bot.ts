@@ -3,7 +3,30 @@ import * as fetch from "isomorphic-fetch";
 import * as fs from 'fs';
 import * as path from 'path';
 
+interface ServerData {
+
+    mapMode: Number
+    players: Number
+    queued: Number
+    map: string
+    slots: {
+        1: {
+            current: Number,
+            max: Number
+        }
+        2: {
+            current: Number,
+            max: Number
+        }
+    }
+
+    url: string
+}
+
+
 class Bot {
+
+    public mapmap: any = { "MP_001": "Grand Bazaar", "MP_003": "Tehran Highway", "MP_007": "Caspian Border", "MP_011": "Seine Crossing", "MP_012": "Operation Firestorm", "MP_013": "Damavand Peak", "MP_017": "Noshahr Canals", "MP_018": "Kharg Island", "MP_Subway": "Operation Metro", "XP1_001": "Strike at Karkand", "XP1_002": "Gulf of Oman", "XP1_003": "Sharqi Peninsula", "XP1_004": "Wake Island", "XP2_Factory": "Scrapmetal", "XP2_Office": "Operation 925", "XP2_Palace": "Donya Fortress", "XP2_Skybar": "Ziba Tower", "XP3_Alborz": "Alborz Mountains", "XP3_Desert": "Bandar Desert", "XP3_Shield": "Armored Shield", "XP3_Valley": "Death Valley", "XP4_FD": "Markaz Monolith", "XP4_Parl": "Azadi Palace", "XP4_Quake": "Epicenter", "XP4_Rubble": "Talah Market", "XP5_001": "Operation Riverside", "XP5_002": "Nebandan Flats", "XP5_003": "Kiasar Railroad", "XP5_004": "Sabalan Pipeline" };
 
     public token: string;
     public refreshInterval: number;
@@ -13,7 +36,7 @@ class Bot {
     private platform: string;
 
     private servercallSign: string;
-    private usemapname:boolean = false;
+    private usemapname: boolean = false;
 
     private admins: string[] = [];
 
@@ -67,7 +90,7 @@ class Bot {
             if (msg.content == '!!debug') {
 
                 let out = `::::DEBUG::::\nplatform:${this.platform}\nserver:${this.serverid}\n`
-                out += `\`\`\`json\n${JSON.stringify(await Bot.getServerStats(this.platform, this.serverid))}`;
+                out += `\`\`\`json\n${JSON.stringify(await Bot.getServerStatsBattleLog(this.serverid))}`;
                 out = out.slice(0, 1994) + "...```"
                 try {
                     await msg.channel.send(out);
@@ -88,33 +111,39 @@ class Bot {
     public async setPresencePlayerCount() {
         let self = this;
         try {
-            let data = await Bot.getServerStats(self.platform, self.serverid);
-            if (data) {
-                if (data.status === "found") {
-                    if (data.srv) {
-                        let srv = data.srv;
-                        if (srv.slots != undefined && srv.players != undefined && srv.map_name && srv.battlelog) {
-                            let name = ""; 
-                            
-                            if(this.usemapname && srv.map_name){
-                                name += srv.map_name;
-                            }else{
-                                name += self.servercallSign;
-                            }
-                            
-                            name = name.slice(0,12); //truncate overflow
+            //let data = await Bot.getServerStats(self.platform, self.serverid);
+            let data = await Bot.getServerStatsBattleLog(self.serverid);
 
-                            name += " | " + srv.players + "/" + srv.slots;
-                            self.client.user.setPresence({ game: { name: name, url: srv.battlelog, type: "PLAYING" }, status: "online" });
-                        }
-                    }
-                }
+            if (!data) return;
+
+            if (!data.slots['2']) return;
+            if (!data.map) return;
+
+            let map = self.mapmap[data.map];
+            if (!map) map = ""
+            let players = data.slots[2].current;
+            let maxplayers = data.slots[2].max;
+            let url = data.url;
+
+            let name = "";
+            if (this.usemapname && map) {
+                name += map;
+            } else {
+                name += self.servercallSign;
             }
+
+            name = name.slice(0, 12); //truncate overflow
+
+            name += " | " + players + "/" + maxplayers;
+            self.client.user.setPresence({ game: { name: name, url: url, type: "PLAYING" }, status: "online" });
+
         } catch (e) {
             console.log(JSON.stringify(e));
         }
     }
     /**
+     * This endpoint will not exist soon
+     * use getServerStatsBattleLog instead
      * http://bf3stats.com/api#server
      */
     public static async getServerStats(platform: string, serverid: string): Promise<any> {
@@ -138,6 +167,23 @@ class Bot {
             }
         });
     }
+
+
+    public static async getServerStatsBattleLog(serverid: string): Promise<ServerData> {
+        let res = await fetch(`http://battlelog.battlefield.com/bf3/servers/getNumPlayersOnServer/pc/${serverid}/`,
+            {
+                method: "GET",
+                headers: {
+                    'Accept': 'application/json'
+                }
+            }
+        );
+        let data = <ServerData>await res.json();
+        data.url = `http://battlelog.battlefield.com/bf3/servers/show/pc/${serverid}/`
+
+        return data;
+    }
+
 
 
     public static existsWithin(a: any, b: any[]): boolean {
